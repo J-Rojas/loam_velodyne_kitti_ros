@@ -290,6 +290,8 @@ void laserCloudLessSharpHandler(const sensor_msgs::PointCloud2ConstPtr& cornerPo
 {
   timeCornerPointsLessSharp = cornerPointsLessSharp2->header.stamp.toSec();
 
+  //ROS_INFO("Time corner less sharp: %f\n", timeCornerPointsLessSharp);
+
   cornerPointsLessSharp->clear();
   pcl::fromROSMsg(*cornerPointsLessSharp2, *cornerPointsLessSharp);
   std::vector<int> indices;
@@ -300,6 +302,8 @@ void laserCloudLessSharpHandler(const sensor_msgs::PointCloud2ConstPtr& cornerPo
 void laserCloudFlatHandler(const sensor_msgs::PointCloud2ConstPtr& surfPointsFlat2)
 {
   timeSurfPointsFlat = surfPointsFlat2->header.stamp.toSec();
+
+  //ROS_INFO("Time surf points flat: %f\n", timeSurfPointsFlat);
 
   surfPointsFlat->clear();
   pcl::fromROSMsg(*surfPointsFlat2, *surfPointsFlat);
@@ -312,6 +316,8 @@ void laserCloudLessFlatHandler(const sensor_msgs::PointCloud2ConstPtr& surfPoint
 {
   timeSurfPointsLessFlat = surfPointsLessFlat2->header.stamp.toSec();
 
+  //ROS_INFO("Time surf points less flat: %f\n", timeSurfPointsLessFlat);
+
   surfPointsLessFlat->clear();
   pcl::fromROSMsg(*surfPointsLessFlat2, *surfPointsLessFlat);
   std::vector<int> indices;
@@ -323,6 +329,8 @@ void laserCloudFullResHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud
 {
   timeLaserCloudFullRes = laserCloudFullRes2->header.stamp.toSec();
 
+  //ROS_INFO("Time laser cloud full res: %f\n", timeLaserCloudFullRes);
+
   laserCloudFullRes->clear();
   pcl::fromROSMsg(*laserCloudFullRes2, *laserCloudFullRes);
   std::vector<int> indices;
@@ -333,6 +341,8 @@ void laserCloudFullResHandler(const sensor_msgs::PointCloud2ConstPtr& laserCloud
 void imuTransHandler(const sensor_msgs::PointCloud2ConstPtr& imuTrans2)
 {
   timeImuTrans = imuTrans2->header.stamp.toSec();
+
+  //ROS_INFO("Time imu trans: %f\n", timeImuTrans);
 
   imuTrans->clear();
   pcl::fromROSMsg(*imuTrans2, *imuTrans);
@@ -457,7 +467,6 @@ int main(int argc, char** argv)
         transformSum[2] += imuRollStart;
 
         systemInited = true;
-        continue;
       }
 
       transform[3] -= imuVeloFromStartX * scanPeriod;

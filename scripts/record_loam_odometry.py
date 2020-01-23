@@ -24,14 +24,14 @@ def odom_callback_loam(data):
 	global trajectoryFile
 	global timeStamp
 	global pitch
-	timeStampNum = data.header.stamp.secs + (data.header.stamp.nsecs * 10**(-9))
-	timeStamp = str(timeStampNum)
+	print(data.header)
+	timeStampStr = str(data.header.stamp.secs) + "." + "{:09d}".format(data.header.stamp.nsecs)
 	quaternion = (data.pose.pose.orientation.x, data.pose.pose.orientation.y, data.pose.pose.orientation.z, data.pose.pose.orientation.w)
 	euler = tf.transformations.euler_from_quaternion(quaternion)
 	roll = euler[0]
 	pitch = euler[1]
 	yaw = euler[2]
-	trajectoryFile.write(timeStamp + " " + str(data.pose.pose.position.z) + " " + str(data.pose.pose.position.x) + " " + str(pitch) + "\n")	
+	trajectoryFile.write(timeStampStr + " " + str(data.pose.pose.position.z) + " " + str(data.pose.pose.position.x) + " " + str(pitch) + "\n")	
 
 def writeFile(file):
 	global trajectoryFile

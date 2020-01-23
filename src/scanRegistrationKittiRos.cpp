@@ -52,6 +52,7 @@
 #include <cstdlib>
 #include <string>
 #include <fstream>
+#include <chrono>
 
 #include <unistd.h>
 #include <signal.h>
@@ -62,10 +63,10 @@ using std::atan2;
 
 const double scanPeriod = 0.1;
 
-const int systemDelay = 20;
+const int systemDelay = 0;
 //const int systemDelay = 200;
 int systemInitCount = 0;
-bool systemInited = false;
+bool systemInited = true;
 
 //const int N_SCANS = 16;
 const int N_SCANS = 64;
@@ -642,25 +643,12 @@ void laserCloudHandler(pcl::PointCloud<pcl::PointXYZ> laserCloudIn, double timeS
 
   }
 
-  //std::cout<<"HolaMundo 777\n";
-
   cloudSize = count;
-
-  //std::cout<<"cloud size:"<<cloudSize<<std::endl;
 
   pcl::PointCloud<PointType>::Ptr laserCloud(new pcl::PointCloud<PointType>());
   for (int i = 0; i < N_SCANS; i++) {
     *laserCloud += laserCloudScans[i];
   }
-
-  //std::cout<<"laser cloud size:"<<laserCloud->size()<<std::endl;
-
-  //std::cout<<"laser cloud pt1:"<<laserCloud->points[0].x<<std::endl;
-  //std::cout<<"laser cloud pt2:"<<laserCloud->points[cloudSize-1].x<<std::endl;
-
-  //std::cout<<"HolaMundo 778\n";
-
-  
 
   pcl::PointCloud<PointType> cornerPointsSharp;
   pcl::PointCloud<PointType> cornerPointsLessSharp;
@@ -668,9 +656,6 @@ void laserCloudHandler(pcl::PointCloud<pcl::PointXYZ> laserCloudIn, double timeS
   pcl::PointCloud<PointType> surfPointsLessFlat;
 
   extractFeatures(laserCloud, cloudSize, cornerPointsSharp, cornerPointsLessSharp, surfPointsFlat, surfPointsLessFlat);
-  //std::cout<<"Sharp points: "<<cornerPointsSharp.size()<<std::endl;
-  //std::cout<<"Less sharp points: "<<cornerPointsLessSharp.size()<<std::endl;
-
 
   sensor_msgs::PointCloud2 laserCloudOutMsg;
   pcl::toROSMsg(*laserCloud, laserCloudOutMsg);
@@ -731,7 +716,6 @@ void laserCloudHandler(pcl::PointCloud<pcl::PointXYZ> laserCloudIn, double timeS
   imuTransMsg.header.frame_id = "/camera";
   pubImuTrans.publish(imuTransMsg);
 
-
 }
 
 void imuHandler(const sensor_msgs::Imu::ConstPtr& imuIn)
@@ -758,18 +742,26 @@ void imuHandler(const sensor_msgs::Imu::ConstPtr& imuIn)
   AccumulateIMUShift();
 }
 
-std::string getFrameStr(unsigned int frame)
+std::string getFrameStr(unsigned int frame, unsigned int padding=10)
 {
-	if(frame>9999)
-		return "0"+std::to_string(frame);
-	else if(frame>999)
-		return "00"+std::to_string(frame);
-	else if(frame>99)
-		return "000"+std::to_string(frame);
-	else if(frame>9)
-		return "0000"+std::to_string(frame);
-	else if(frame<=9)
-		return "00000"+std::to_string(frame);
+  char pr[50];
+  char buffer[50];
+  sprintf(buffer, "%010d", frame);
+	return std::string(buffer);
+}
+
+double timeStrToTimeStamp(std::string& timeStr) {
+
+  std::tm tm = {};
+  strptime(timeStr.c_str(), "%Y-%0m-%0d %0H:%0M:%0S", &tm);
+  auto nanosecs = std::stol(timeStr.substr(timeStr.find('.') + 1));
+
+  std::chrono::high_resolution_clock::time_point time_point = std::chrono::high_resolution_clock::from_time_t(std::mktime(&tm));
+
+  int64_t nanoseconds = time_point.time_since_epoch().count() + nanosecs;
+  double time = ((double) nanoseconds) / (double) 1000000000.0; 
+
+  return time;
 }
 
 void my_handler(int s){
@@ -816,36 +808,68 @@ int main(int argc, char** argv)
 
   pcl::PointCloud<pcl::PointXYZ> cloud;
 
-  // allocate 4 MB buffer (only ~130*4*4 KB are needed)
-  int32_t num = 1000000;
-  float *data = (float*)malloc(num*sizeof(float));
-
   // pointers
-  float *px = data+0;
-  float *py = data+1;
-  float *pz = data+2;
-  float *pr = data+3;
+  float *px = NULL;
+  float *py = NULL;
+  float *pz = NULL;
+  float *pr = NULL;
 
   unsigned int currentFrame = 0;
   
   std::string path = argv[1];//load path
   std::string sequence = argv[2];//load sequence
-  std::string file = path + "/data_odometry_velodyne/dataset/" + sequence + "/velodyne/" + getFrameStr(currentFrame) + ".bin";
+  std::string file = path + "/velodyne_points/data/" + getFrameStr(currentFrame) + ".bin";
 
   FILE *stream;
-  stream = fopen (file.c_str(),"rb");
-  //std::cout<<file<<std::endl;
-
-  std::string timesFileStr = path + "/data_odometry_calib/dataset/sequences/" + sequence + "/times.txt";
+  
+  std::string timesFileStr = path + "/velodyne_points/timestamps.txt";
   std::ifstream timesFile(timesFileStr);
   std::string timeStr;
   double time;
+  bool complete = false;
 
   ros::Rate r(2); // 10 hz
 
-  while(stream!=NULL)//read all .bin files in a sequence
+  sleep(4.0);
+
+  while(!complete)//read all .bin files in a sequence
   {
-	  num = fread(data,sizeof(float),num,stream)/4;
+
+    ros::spinOnce();
+
+    getline (timesFile,timeStr);
+    std::cout << "timeStr: '" << timeStr << "'" << std::endl;
+    
+    if (timesFile.eof()) {
+      complete = true;
+      continue;      
+    }
+
+    if (timeStr == "") {
+      // skip frame
+      currentFrame++;
+      continue; 
+    }
+    
+    file = path + "/velodyne_points/data/" + getFrameStr(currentFrame) + ".bin";
+    stream = fopen (file.c_str(),"rb");
+
+    if (stream == NULL) {
+      complete = true;
+      continue;
+    }
+
+    std::cout<<file<<std::endl;
+
+    // allocate 4 MB buffer (only ~130*4*4 KB are needed
+    unsigned int num = 1000000;
+	  float* data = (float*)malloc(num*sizeof(float));
+	  
+    num = fread(data,sizeof(float),num,stream)/4;
+	  px = data+0;
+	  py = data+1;
+    pz = data+2;
+    pr = data+3;
 
 	  cloud.clear();
 
@@ -859,32 +883,20 @@ int main(int argc, char** argv)
 	    px+=4; py+=4; pz+=4; pr+=4;
 	  }
 
-	  getline (timesFile,timeStr);
-	  time = std::stof(timeStr);
-
+    time = timeStrToTimeStamp(timeStr);
 	  laserCloudHandler(cloud, (double)(time));
 
 	  //reset variables to read a new sweep
 	  fclose(stream);
 	  currentFrame++;
-	  file = path + "/data_odometry_velodyne/dataset/" + sequence + "/velodyne/" + getFrameStr(currentFrame) + ".bin";
-	  //std::cout<<file<<std::endl;
 	  fflush(stream);
-	  stream = fopen (file.c_str(),"rb");
 	  free(data);
-	  num = 1000000;
-	  data = (float*)malloc(num*sizeof(float));
-	  px = data+0;
-	  py = data+1;
-    pz = data+2;
-    pr = data+3;
-
+	  
     r.sleep();
   }
 
-  free(data);
-
-  ros::spin();
+  std::cout << currentFrame << "frame(s) processed" << std::endl;
+  std::cout << "No more data to process." << std::endl;
 
   return 0;
 }

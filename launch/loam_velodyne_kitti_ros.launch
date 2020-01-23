@@ -1,8 +1,9 @@
 <launch>
 
   <arg name="rviz" default="true" />
+  <arg name="path" />
 
-  <node pkg="loam_velodyne_kitti_ros" type="scanRegistrationKittiRos" name="scanRegistrationKittiRos" args="/home/claydergc/KITTIBenchmark 00" output="screen"/>
+  <node pkg="loam_velodyne_kitti_ros" type="scanRegistrationKittiRos" name="scanRegistrationKittiRos" args="$(arg path)" output="screen"/>
 
   <node pkg="loam_velodyne_kitti_ros" type="laserOdometryKittiRos" name="laserOdometryKittiRos" output="screen" respawn="true">
   </node>
